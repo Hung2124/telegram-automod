@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     # Telegram
-    telegram_bot_token: str
+    telegram_bot_token: str = ""
     telegram_webhook_url: str = ""
     telegram_webhook_secret: str = ""
 
@@ -26,12 +26,21 @@ class Settings(BaseSettings):
     # Stripe
     stripe_secret_key: str = ""
     stripe_webhook_secret: str = ""
-    stripe_price_id_pro: str = ""
+    stripe_pro_monthly_price_id: str = ""
+    stripe_enterprise_monthly_price_id: str = ""
+    stripe_success_url: str = "https://example.com/subscribe/success"
+    stripe_cancel_url: str = "https://example.com/subscribe/cancel"
 
     # App
+    secret_key: str = "changeme"
     log_level: str = "INFO"
     admin_telegram_ids: str = ""  # CSV of int
-    free_tier_monthly_limit: int = 500
+
+    # Plan limits (msg/day)
+    free_daily_limit: int = 200
+    pro_daily_limit: int = 5000
+    free_group_limit: int = 1
+    pro_group_limit: int = 10
 
     @property
     def admin_ids(self) -> list[int]:
