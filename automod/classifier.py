@@ -34,19 +34,50 @@ Return STRICT JSON: {"is_violation": bool, "category": str, "severity": str, "re
 Categories: spam, scam, nsfw, hate, off_topic, advertising, ok
 Severity:   none (ok), low, medium, high
 
-Be strict on: crypto pump-and-dump, fake giveaway scams, phishing links, NSFW content, hate speech, repeated promotional spam, explicit sexual language, strong profanity or vulgar insults in ANY language (including Vietnamese: e.g. lồn, cặc, đụ, địt, vãi, etc.).
+Be strict on: crypto pump-and-dump, fake giveaway scams, phishing links, NSFW content, hate speech, repeated promotional spam, explicit sexual language, strong profanity or vulgar insults in ANY language (including Vietnamese).
 Be lenient on: casual off-topic chat, mild jokes without insults."""
+
+
+# Vietnamese + English profanity blacklist (rule-based, runs before LLM)
+_PROFANITY_LIST = [
+    "lồn", "cặc", "đụ", "địt", "đéo", "đmm", "đm", "vãi lồn",
+    "con cặc", "cái lồn", "mẹ mày", "bố mày", "đồ chó", "đồ ngu",
+    "fuck", "shit", "asshole", "bitch", "motherfucker", "bastard",
+    "cunt", "motherfuck", "cock", "fuk", "wtf", "stfu",
+]
+
+
+def _rule_based_check(text: str) -> Verdict | None:
+    """Return Verdict if text matches profanity blacklist, else None."""
+    lower = text.lower().strip()
+    for word in _PROFANITY_LIST:
+        if word in lower:
+            return Verdict(
+                is_violation=True,
+                category="nsfw",
+                severity="medium",
+                reason=f"profanity detected: '{word}'",
+                confidence=0.95,
+            )
+    return None
 
 
 async def classify(message_text: str, group_rules: str = "") -> Verdict:
     """Classify a single message. Returns Verdict.
 
-    For empty / very short messages, returns ok without calling LLM (cost saving).
+    Rule-based check runs first (fast, free). Falls back to LLM for
+    nuanced cases like scam/spam detection.
     """
     text = (message_text or "").strip()
-    if len(text) < 3:
+    if len(text) < 2:
         return Verdict(False, "ok", "none", "too short", 1.0)
 
+    # Fast rule-based check first (profanity blacklist)
+    rule_verdict = _rule_based_check(text)
+    if rule_verdict is not None:
+        return rule_verdict
+
+    # LLM fallback for scam/spam/hate detection
     user_prompt = f"GROUP RULES (if any):\n{group_rules or '(default)'}\n\nMESSAGE:\n{text}"
 
     if settings.llm_provider == "xiaomi":
@@ -67,20 +98,25 @@ async def _classify_xiaomi(user_prompt: str) -> Verdict:
         api_key=settings.xiaomi_api_key,
         base_url=settings.xiaomi_base_url,
     )
-    resp = await client.chat.completions.create(
-        model=settings.xiaomi_model,
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user_prompt + "\n\nReturn ONLY the JSON object, no prose."},
-        ],
-        temperature=0.0,
-        max_tokens=200,
-    )
-    raw = (resp.choices[0].message.content or "{}").strip()
-    if raw.startswith("```"):
-        raw = raw.split("```")[1].lstrip("json\n")
-    data = json.loads(raw)
-    return _to_verdict(data)
+    try:
+        resp = await client.chat.completions.create(
+            model=settings.xiaomi_model,
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": user_prompt + "\n\nReturn ONLY the JSON object, no prose."},
+            ],
+            temperature=0.0,
+            max_tokens=200,
+        )
+        raw = (resp.choices[0].message.content or "{}").strip()
+        if raw.startswith("```"):
+            raw = raw.split("```")[1].lstrip("json\n")
+        if not raw:
+            return Verdict(False, "ok", "none", "llm returned empty", 0.5)
+        data = json.loads(raw)
+        return _to_verdict(data)
+    except Exception:
+        return Verdict(False, "ok", "none", "llm error", 0.5)
 
 
 async def _classify_openai(user_prompt: str) -> Verdict:
@@ -113,7 +149,6 @@ async def _classify_anthropic(user_prompt: str) -> Verdict:
         temperature=0.0,
     )
     raw = resp.content[0].text.strip()
-    # Anthropic may wrap in code fences
     if raw.startswith("```"):
         raw = raw.split("```")[1].lstrip("json\n")
     data = json.loads(raw)
