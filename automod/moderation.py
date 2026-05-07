@@ -36,7 +36,7 @@ async def on_group_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         thresholds: dict[str, str] = group.action_thresholds or {
             "high": "delete_and_mute",
             "medium": "delete",
-            "low": "warn",
+            "low": "delete",
         }
         mute_minutes = group.mute_duration_minutes or 60
 

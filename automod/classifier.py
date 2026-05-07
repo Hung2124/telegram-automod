@@ -34,8 +34,8 @@ Return STRICT JSON: {"is_violation": bool, "category": str, "severity": str, "re
 Categories: spam, scam, nsfw, hate, off_topic, advertising, ok
 Severity:   none (ok), low, medium, high
 
-Be strict on: crypto pump-and-dump, fake giveaway scams, phishing links, NSFW content, hate speech, repeated promotional spam.
-Be lenient on: casual off-topic chat, mild profanity, jokes."""
+Be strict on: crypto pump-and-dump, fake giveaway scams, phishing links, NSFW content, hate speech, repeated promotional spam, explicit sexual language, strong profanity or vulgar insults in ANY language (including Vietnamese: e.g. lồn, cặc, đụ, địt, vãi, etc.).
+Be lenient on: casual off-topic chat, mild jokes without insults."""
 
 
 async def classify(message_text: str, group_rules: str = "") -> Verdict:
