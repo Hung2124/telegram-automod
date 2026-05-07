@@ -39,12 +39,16 @@ async def check_and_increment(
     key = _quota_key(group_id)
 
     owned = redis_client is None
-    r = redis_client if redis_client is not None else await get_redis()
     try:
-        current = await r.incr(key)
-        if current == 1:
-            await r.expire(key, 86400)
-        return current <= limit
-    finally:
-        if owned:
-            await r.aclose()
+        r = redis_client if redis_client is not None else await get_redis()
+        try:
+            current = await r.incr(key)
+            if current == 1:
+                await r.expire(key, 86400)
+            return current <= limit
+        finally:
+            if owned:
+                await r.aclose()
+    except Exception:
+        # Redis unavailable — fail open (allow the message through)
+        return True
