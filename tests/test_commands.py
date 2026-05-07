@@ -276,3 +276,150 @@ async def test_cmd_unsubscribe_no_subscription(db_session) -> None:
 
     reply = update.message.reply_text.call_args[0][0]
     assert "no active" in reply.lower() or "not found" in reply.lower()
+
+
+@pytest.mark.asyncio
+async def test_cmd_unsubscribe_with_active_subscription(db_session) -> None:
+    """Unsubscribe cancels Stripe subscription successfully."""
+    g = Group(id=-210, title="G", owner_user_id=10, is_active=True, plan="pro",
+              stripe_subscription_id="sub_test_active")
+    db_session.add(g)
+    await db_session.commit()
+
+    update, context = _make_update(chat_id=-210)
+
+    from unittest.mock import patch, AsyncMock, MagicMock
+    import asyncio
+
+    with patch("stripe.Subscription.cancel", return_value=MagicMock()) as mock_cancel:
+        from automod.commands import cmd_unsubscribe
+        await cmd_unsubscribe(update, context)
+
+    reply = update.message.reply_text.call_args[0][0]
+    assert "cancelled" in reply.lower() or "cancel" in reply.lower()
+
+
+@pytest.mark.asyncio
+async def test_cmd_unsubscribe_stripe_error(db_session) -> None:
+    """Unsubscribe handles Stripe error gracefully."""
+    g = Group(id=-211, title="G", owner_user_id=10, is_active=True, plan="pro",
+              stripe_subscription_id="sub_to_fail")
+    db_session.add(g)
+    await db_session.commit()
+
+    update, context = _make_update(chat_id=-211)
+
+    from unittest.mock import patch
+    with patch("stripe.Subscription.cancel", side_effect=Exception("stripe error")):
+        from automod.commands import cmd_unsubscribe
+        await cmd_unsubscribe(update, context)
+
+    reply = update.message.reply_text.call_args[0][0]
+    assert "failed" in reply.lower() or "try again" in reply.lower()
+
+
+@pytest.mark.asyncio
+async def test_cmd_automod_status_no_group(db_session, fake_redis) -> None:
+    """Status command shows message if group not configured."""
+    update, context = _make_update(chat_id=-212, args=["status"])
+
+    from automod.commands import cmd_automod
+    await cmd_automod(update, context)
+
+    reply = update.message.reply_text.call_args[0][0]
+    assert "not configured" in reply.lower() or "automod on" in reply.lower()
+
+
+@pytest.mark.asyncio
+async def test_cmd_automod_reset_warns_no_args(db_session) -> None:
+    """reset_warns without username shows usage message."""
+    update, context = _make_update(args=["reset_warns"])
+    from automod.commands import cmd_automod
+    await cmd_automod(update, context)
+    reply = update.message.reply_text.call_args[0][0]
+    assert "usage" in reply.lower() or "username" in reply.lower()
+
+
+@pytest.mark.asyncio
+async def test_cmd_automod_reset_warns_user_not_found(db_session) -> None:
+    """reset_warns with unknown user returns appropriate message."""
+    g = Group(id=-213, title="G", owner_user_id=10, is_active=True)
+    db_session.add(g)
+    await db_session.commit()
+
+    update, context = _make_update(chat_id=-213, args=["reset_warns", "@ghostuser"])
+    from automod.commands import cmd_automod
+    await cmd_automod(update, context)
+
+    reply = update.message.reply_text.call_args[0][0]
+    assert "not found" in reply.lower()
+
+
+@pytest.mark.asyncio
+async def test_cmd_automod_reset_warns_member_not_found(db_session) -> None:
+    """reset_warns when user exists but not in group."""
+    g = Group(id=-214, title="G", owner_user_id=10, is_active=True)
+    u = User(id=66, username="lostuser", first_name="Lost")
+    db_session.add_all([g, u])
+    await db_session.commit()
+
+    update, context = _make_update(chat_id=-214, args=["reset_warns", "lostuser"])
+    from automod.commands import cmd_automod
+    await cmd_automod(update, context)
+
+    reply = update.message.reply_text.call_args[0][0]
+    assert "no record" in reply.lower() or "not found" in reply.lower()
+
+
+@pytest.mark.asyncio
+async def test_cmd_stats_in_private_chat(db_session) -> None:
+    """Stats command in private chat returns group-only message."""
+    update, context = _make_update(chat_type="private")
+    from automod.commands import cmd_stats
+    await cmd_stats(update, context)
+    reply = update.message.reply_text.call_args[0][0]
+    assert "group" in reply.lower()
+
+
+@pytest.mark.asyncio
+async def test_cmd_subscribe_in_private_chat(db_session) -> None:
+    """Subscribe command in private chat returns group-only message."""
+    update, context = _make_update(chat_type="private")
+    from automod.commands import cmd_subscribe
+    await cmd_subscribe(update, context)
+    reply = update.message.reply_text.call_args[0][0]
+    assert "group" in reply.lower()
+
+
+@pytest.mark.asyncio
+async def test_cmd_subscribe_stripe_error(db_session) -> None:
+    """Subscribe handles Stripe error gracefully."""
+    update, context = _make_update(chat_id=-215)
+
+    from unittest.mock import patch, AsyncMock
+    with patch("automod.stripe_handler.create_checkout_session", new_callable=AsyncMock, side_effect=Exception("stripe error")):
+        from automod.commands import cmd_subscribe
+        await cmd_subscribe(update, context)
+
+    reply = update.message.reply_text.call_args[0][0]
+    assert "failed" in reply.lower() or "try again" in reply.lower()
+
+
+@pytest.mark.asyncio
+async def test_cmd_unsubscribe_in_private_chat(db_session) -> None:
+    """Unsubscribe in private chat returns group-only message."""
+    update, context = _make_update(chat_type="private")
+    from automod.commands import cmd_unsubscribe
+    await cmd_unsubscribe(update, context)
+    reply = update.message.reply_text.call_args[0][0]
+    assert "group" in reply.lower()
+
+
+@pytest.mark.asyncio
+async def test_cmd_unsubscribe_non_admin_blocked(db_session) -> None:
+    """Non-admin cannot use unsubscribe."""
+    update, context = _make_update(is_admin=False)
+    from automod.commands import cmd_unsubscribe
+    await cmd_unsubscribe(update, context)
+    reply = update.message.reply_text.call_args[0][0]
+    assert "admin" in reply.lower()

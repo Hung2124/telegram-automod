@@ -10,7 +10,7 @@ from telegram.ext import Application, MessageHandler, CommandHandler, filters
 
 from .config import settings
 from .moderation import on_group_message
-from .commands import cmd_start, cmd_automod, cmd_stats
+from .commands import cmd_start, cmd_automod, cmd_stats, cmd_subscribe, cmd_unsubscribe
 
 logging.basicConfig(level=settings.log_level)
 log = structlog.get_logger()
@@ -21,12 +21,17 @@ def build_application() -> Application:
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("automod", cmd_automod))
     app.add_handler(CommandHandler("stats", cmd_stats))
+    app.add_handler(CommandHandler("subscribe", cmd_subscribe))
+    app.add_handler(CommandHandler("unsubscribe", cmd_unsubscribe))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS, on_group_message))
     return app
 
 
 def create_fastapi(ptb_app: Application) -> FastAPI:
     api = FastAPI(title="Telegram Auto-Mod")
+
+    from .api import router as api_router
+    api.include_router(api_router)
 
     @api.on_event("startup")
     async def _startup() -> None:
