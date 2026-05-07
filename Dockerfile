@@ -24,5 +24,7 @@ RUN pip install --no-cache-dir -e ".[dev]" || pip install --no-cache-dir \
 
 COPY . .
 
-# Run migrations then start
-CMD alembic upgrade head && uvicorn automod.main:app --host 0.0.0.0 --port ${PORT:-8000}
+# Render cung cấp DATABASE_URL dạng postgresql://, cần đổi thành postgresql+asyncpg://
+CMD export DATABASE_URL=$(echo $DATABASE_URL | sed 's|^postgres://|postgresql+asyncpg://|;s|^postgresql://|postgresql+asyncpg://|') \
+    && alembic upgrade head \
+    && uvicorn automod.main:app --host 0.0.0.0 --port ${PORT:-8000}
