@@ -23,7 +23,11 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     anthropic_model: str = "claude-3-5-haiku-latest"
 
-    # Storage
+    # Quota limits
+    free_daily_limit: int = 100
+    pro_daily_limit: int = 5000
+    enterprise_daily_limit: int = 999999
+
     database_url: str = "postgresql+asyncpg://automod:automod@localhost:5432/automod"
     redis_url: str = "redis://localhost:6379/0"
 
