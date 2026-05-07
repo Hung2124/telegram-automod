@@ -9,8 +9,8 @@ class Settings(BaseSettings):
 
     # Telegram
     telegram_bot_token: str = ""
-    telegram_webhook_url: str = ""
-    telegram_webhook_secret: str = ""
+    telegram_webhook_url: str = ""          # e.g. https://yourapp.railway.app
+    telegram_webhook_secret: str = "automod-secret-2024"
 
     # LLM
     llm_provider: str = "openai"
@@ -23,24 +23,25 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://automod:automod@localhost:5432/automod"
     redis_url: str = "redis://localhost:6379/0"
 
-    # Stripe
-    stripe_secret_key: str = ""
-    stripe_webhook_secret: str = ""
-    stripe_pro_monthly_price_id: str = ""
-    stripe_enterprise_monthly_price_id: str = ""
-    stripe_success_url: str = "https://example.com/subscribe/success"
-    stripe_cancel_url: str = "https://example.com/subscribe/cancel"
+    # JWT
+    jwt_secret: str = "change-me-in-production"
+    jwt_algorithm: str = "HS256"
+    jwt_expire_hours: int = 24
+
+    # LemonSqueezy billing
+    lemonsqueezy_api_key: str = ""
+    lemonsqueezy_webhook_secret: str = ""   # set in LS dashboard → Webhooks
+    lemonsqueezy_store_id: str = "368020"
+    lemonsqueezy_pro_variant_id: str = ""       # fill after creating product
+    lemonsqueezy_enterprise_variant_id: str = ""  # fill after creating product
+    lemonsqueezy_pro_checkout_url: str = ""     # auto-generated or manual
+    lemonsqueezy_enterprise_checkout_url: str = ""
+
+    # Admin
+    admin_telegram_ids: str = ""
 
     # App
-    secret_key: str = "changeme"
     log_level: str = "INFO"
-    admin_telegram_ids: str = ""  # CSV of int
-
-    # Plan limits (msg/day)
-    free_daily_limit: int = 200
-    pro_daily_limit: int = 5000
-    free_group_limit: int = 1
-    pro_group_limit: int = 10
 
     @property
     def admin_ids(self) -> list[int]:

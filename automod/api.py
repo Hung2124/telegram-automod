@@ -26,7 +26,7 @@ _bearer = HTTPBearer()
 
 def _decode_token(token: str) -> dict[str, Any]:
     try:
-        return jwt.decode(token, settings.secret_key, algorithms=["HS256"])
+        return jwt.decode(token, settings.jwt_secret, algorithms=["HS256"])
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired")
     except jwt.InvalidTokenError:
@@ -48,7 +48,7 @@ def create_access_token(user_id: int, expires_minutes: int = 60 * 24) -> str:
         "user_id": user_id,
         "exp": datetime.now(timezone.utc) + timedelta(minutes=expires_minutes),
     }
-    return jwt.encode(payload, settings.secret_key, algorithm="HS256")
+    return jwt.encode(payload, settings.jwt_secret, algorithm="HS256")
 
 
 # ---------------------------------------------------------------------------
@@ -231,14 +231,34 @@ async def group_stats(
     }
 
 
-@router.post("/stripe/webhook", status_code=200)
-async def stripe_webhook(request: Request) -> dict[str, str]:
+@router.post("/webhook/lemonsqueezy", status_code=200)
+async def lemonsqueezy_webhook(request: Request) -> dict[str, str]:
     payload = await request.body()
-    sig = request.headers.get("stripe-signature", "")
+    sig = request.headers.get("x-signature", "")
     try:
-        from .stripe_handler import process_webhook_event
+        from .lemonsqueezy_handler import process_webhook_event
         await process_webhook_event(payload, sig)
     except Exception as e:
-        log.error("stripe_webhook_error", err=str(e))
+        log.error("lemonsqueezy_webhook_error", err=str(e))
         raise HTTPException(status_code=400, detail=str(e))
     return {"status": "ok"}
+
+
+@router.get("/payment/success")
+async def payment_success(group_id: int | None = None) -> dict[str, str]:
+    return {"status": "ok", "message": "Payment successful! Your plan has been upgraded."}
+
+
+@router.post("/api/subscribe", status_code=200)
+async def create_checkout(
+    group_id: int,
+    plan: str = "pro",
+    user_id: int = Depends(get_current_user_id),
+) -> dict[str, str]:
+    """Generate a LemonSqueezy checkout URL for the given group/plan."""
+    from .lemonsqueezy_handler import create_checkout_url
+    try:
+        url = await create_checkout_url(group_id=group_id, user_id=user_id, plan=plan)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"checkout_url": url}
