@@ -12,8 +12,12 @@ class Settings(BaseSettings):
     telegram_webhook_url: str = ""          # e.g. https://yourapp.railway.app
     telegram_webhook_secret: str = "automod-secret-2024"
 
-    # LLM
-    llm_provider: str = "openai"
+    # LLM (Xiaomi MiMo — OpenAI-compatible)
+    llm_provider: str = "xiaomi"
+    xiaomi_api_key: str = ""
+    xiaomi_base_url: str = "https://token-plan-sgp.xiaomimimo.com/v1"
+    xiaomi_model: str = "mimo-v2.5-pro"
+    # Legacy OpenAI/Anthropic fallback (optional)
     openai_api_key: str = ""
     openai_model: str = "gpt-4o-mini"
     anthropic_api_key: str = ""
